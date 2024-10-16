@@ -48,6 +48,18 @@ def send_data_to_node_api():
     except requests.exceptions.RequestException as e:
         print(f"Error sending data to Node.js API: {e}")
 
+# get homepage
+
+@app.route('/')
+def home():
+    return '''
+    <h1>Image Recognition API</h1>
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="imageFile">
+        <input type="submit" value="Upload">
+    </form>
+    '''
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Check if an image file is part of the request
