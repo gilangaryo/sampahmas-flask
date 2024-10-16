@@ -3,27 +3,37 @@ import cv2
 import cvlib as cv
 import numpy as np
 import requests
-import os
 import logging
-from werkzeug.serving import WSGIRequestHandler
 
 logging.basicConfig(level=logging.INFO)
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  
 
-WSGIRequestHandler.timeout = 60
+net = cv2.dnn.readNetFromCaffe('MobileNetSSD_deploy.prototxt', 'MobileNetSSD_deploy.caffemodel')
+
+CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+           "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
+           "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
+           "sofa", "train", "tvmonitor"]
 
 def detect_bottle(frame):
-    label  = cv.detect_common_objects(frame)
-    if 'bottle' in label:
-        logging.info("Bottle detected!")
-        return True
-    else:
-        logging.info("No bottle detected.")
-        return False
+    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
+    net.setInput(blob)
+    
+    detections = net.forward()
+
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2]
+        if confidence > 0.2:  
+            idx = int(detections[0, 0, i, 1])
+            if CLASSES[idx] == "bottle":
+                print("Bottle detected!")
+                return True
+    print("No bottle detected.")
+    return False
+
 
 def send_data_to_node_api():
     NODE_API_URL = 'https://m2bvdfxc-3000.asse.devtunnels.ms/api/endpoint'
@@ -73,4 +83,4 @@ def upload_file():
         return jsonify({"error": "Invalid file format. Only PNG and JPEG are accepted."}), 400
 
 if __name__ == '__main__':
-    app.run()  
+    app.run(host='0.0.0.0', port=8080)  
