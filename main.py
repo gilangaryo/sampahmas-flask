@@ -27,7 +27,7 @@ CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
            "sofa", "train", "tvmonitor"]
 
 # Ambil path service account dari environment variable
-service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 
 # Pastikan variabel lingkungan sudah diset
 if service_account_path is None:
