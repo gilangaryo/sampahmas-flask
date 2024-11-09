@@ -26,15 +26,12 @@ CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
            "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
            "sofa", "train", "tvmonitor"]
 
-# Ambil path service account dari environment variable
-# service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+
 service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS').strip()
 
-# Pastikan variabel lingkungan sudah diset
 if service_account_path is None:
     raise ValueError("Environment variable GOOGLE_APPLICATION_CREDENTIALS not set")
 
-# Inisialisasi Firebase Admin SDK dengan file service account
 cred = credentials.Certificate(service_account_path)
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'sampahmas-3a4f0.appspot.com'
@@ -67,7 +64,7 @@ def upload_to_firebase(file_path, file_name):
     return blob.public_url
 
 def send_data_to_node_api(url):
-    NODE_API_URL = 'https://m2bvdfxc-3000.asse.devtunnels.ms/api/endpoint'
+    NODE_API_URL = 'https://sampahmas-backend-ox9f.onrender.com/api/endpoint'
     data = {"message": "Bottle detected", "url": url}
 
     try:
@@ -143,9 +140,6 @@ def upload_file():
         bottle_found = detect_bottle(frame)
         if bottle_found:
             unique_file_name = f"{uuid.uuid4()}_{filename}"
-
-            # thread = threading.Thread(target=background_task, args=(file_path, unique_file_name))
-            # thread.start()
 
             executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="Worker")
             executor.submit(background_task, file_path, unique_file_name)
