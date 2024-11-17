@@ -9,10 +9,7 @@ from firebase_admin import credentials, storage
 import uuid
 import os
 from werkzeug.utils import secure_filename
-
-import threading
 from concurrent.futures import ThreadPoolExecutor
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,16 +24,10 @@ CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
            "sofa", "train", "tvmonitor"]
 
 
-# production
 service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS').strip()
 
 if service_account_path is None:
     raise ValueError("Environment variable GOOGLE_APPLICATION_CREDENTIALS not set")
-
-
-
-
-
 
 cred = credentials.Certificate(service_account_path)
 firebase_admin.initialize_app(cred, {
@@ -49,6 +40,7 @@ def detect_bottle_and_draw(frame):
     blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
     net.setInput(blob)
     detections = net.forward()
+    
     bottle_found = False
     percentage = 0
 
@@ -57,24 +49,35 @@ def detect_bottle_and_draw(frame):
         if confidence > 0.5:
             idx = int(detections[0, 0, i, 1])
             if CLASSES[idx] == "bottle":
+                logging.info("Bottle detected!")
                 bottle_found = True
                 percentage = int(confidence * 100)
+                
                 box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
                 (startX, startY, endX, endY) = box.astype("int")
-
+                
                 cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
                 label = f"{CLASSES[idx]}: {percentage}%"
                 y = startY - 8 if startY - 10 > 10 else startY + 10
                 cv2.putText(frame, label, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+                break
+
+    if not bottle_found:
+        logging.info("No bottle detected.")
     
     return bottle_found, frame, percentage
 
-def upload_to_firebase(file_path, file_name):
-    blob = bucket.blob(file_name)
-    blob.upload_from_filename(file_path)
-    blob.make_public()
-    logging.info(f"File uploaded to Firebase Storage: {blob.public_url}")
-    return blob.public_url
+def upload_to_firebase(file_path, firebase_path):
+    try:
+        logging.info("Starting upload to Firebase Storage")
+        blob = bucket.blob(firebase_path)
+        blob.upload_from_filename(file_path)
+        blob.make_public()
+        logging.info(f"File uploaded to Firebase Storage!")
+        return blob.public_url
+    except Exception as e:
+        logging.error(f"Error uploading to Firebase Storage: {str(e)}")
+        return None
 
 def send_data_to_node_api(url):
     NODE_API_URL = 'https://sampahmas-backend-ox9f.onrender.com/api/endpoint'
@@ -91,22 +94,28 @@ def send_data_to_node_api(url):
 
 def background_task(original_path, annotated_path, original_name, annotated_name, percentage):
     try:
-        original_blob = bucket.blob(f'vending/original/{original_name}')
-        original_blob.upload_from_filename(original_path)
-        original_blob.make_public()
-        original_url = original_blob.public_url
-        logging.info(f"Uploaded original image: {original_url}")
+        original_firebase_path = f'vending/original/{original_name}'
+        annotated_firebase_path = f'vending/label/{percentage}_{annotated_name}'
 
-        annotated_blob = bucket.blob(f'vending/label/{percentage}_{annotated_name}')
-        annotated_blob.upload_from_filename(annotated_path)
-        annotated_blob.make_public()
-        annotated_url = annotated_blob.public_url
-        logging.info(f"Uploaded annotated image with percentage: {annotated_url}")
+        original_url = upload_to_firebase(original_path, original_firebase_path)
+        annotated_url = upload_to_firebase(annotated_path, annotated_firebase_path)
 
-        return original_url, annotated_url
+        if original_url:
+            send_data_to_node_api(original_url)
+        
+        logging.info(f"Original and annotated images uploaded. URLs: {original_url}, {annotated_url}")
+
+        if original_url and annotated_url:
+            if os.path.exists(original_path):
+                os.remove(original_path)
+                logging.info(f"Deleted temporary file: {original_path}")
+            if os.path.exists(annotated_path):
+                os.remove(annotated_path)
+                logging.info(f"Deleted temporary file: {annotated_path}")
+        
     except Exception as e:
         logging.error(f"Error in background task: {str(e)}")
-        return None, None
+
 @app.route('/')
 def home():
     return '''
@@ -116,14 +125,6 @@ def home():
         <input type="submit" value="Upload">
     </form>
     '''
-
-
-def background_task(file_path, unique_file_name):
-    try:
-        firebase_url = upload_to_firebase(file_path, unique_file_name)
-        send_data_to_node_api(firebase_url)
-    except Exception as e:
-        logging.error(f"Error in background task: {str(e)}")
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
