@@ -10,22 +10,20 @@ import uuid
 import os
 from werkzeug.utils import secure_filename
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 40 * 1024 * 1024
 
-net = cv2.dnn.readNetFromCaffe('MobileNetSSD_deploy.prototxt', 'MobileNetSSD_deploy.caffemodel')
-
-CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
-           "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
-           "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
-           "sofa", "train", "tvmonitor"]
 
 
-service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS').strip()
+# DEVELOPMENT
+if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'):
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = r'D:\code\backend-sampahmas-deteksi\serviceAccount.json'
 
+service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 if service_account_path is None:
     raise ValueError("Environment variable GOOGLE_APPLICATION_CREDENTIALS not set")
 
@@ -34,13 +32,40 @@ firebase_admin.initialize_app(cred, {
     'storageBucket': 'sampahmas-3a4f0.appspot.com'
 })
 
+# service_account_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS').strip()
+
+# if service_account_path is None:
+#     raise ValueError("Environment variable GOOGLE_APPLICATION_CREDENTIALS not set")
+
+# cred = credentials.Certificate(service_account_path)
+# firebase_admin.initialize_app(cred, {
+#     'storageBucket': 'sampahmas-3a4f0.appspot.com'
+# })
+
 bucket = storage.bucket()
 
 def detect_bottle_and_draw(frame):
+    import time
+
+    net = cv2.dnn.readNetFromCaffe('MobileNetSSD_deploy.prototxt', 'MobileNetSSD_deploy.caffemodel')
+    CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+               "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
+               "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
+               "sofa", "train", "tvmonitor"]
+
+    # Mulai mencatat waktu total
+    total_start_time = time.time()
+
     blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
     net.setInput(blob)
+
+    # Mulai mencatat waktu inferensi
+    start_time = time.time()
     detections = net.forward()
-    
+    end_time = time.time()
+
+    inference_time = end_time - start_time
+
     bottle_found = False
     percentage = 0
 
@@ -52,20 +77,23 @@ def detect_bottle_and_draw(frame):
                 logging.info("Bottle detected!")
                 bottle_found = True
                 percentage = int(confidence * 100)
-                
+
                 box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
                 (startX, startY, endX, endY) = box.astype("int")
-                
+
                 cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
                 label = f"{CLASSES[idx]}: {percentage}%"
                 y = startY - 8 if startY - 10 > 10 else startY + 10
                 cv2.putText(frame, label, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
                 break
 
-    if not bottle_found:
-        logging.info("No bottle detected.")
-    
-    return bottle_found, frame, percentage
+    total_end_time = time.time()
+    total_time = total_end_time - total_start_time
+    logging.info(f"Inference time: {inference_time:.4f} seconds")
+    logging.info(f"Total time (preprocessing + inference + postprocessing): {total_time:.4f} seconds")
+
+    return bottle_found, frame, percentage, inference_time, total_time
+
 
 def upload_to_firebase(file_path, firebase_path):
     try:
@@ -149,7 +177,7 @@ def upload_file():
         with open(original_file_path, 'wb') as f:
             f.write(file_bytes)
 
-        bottle_found, annotated_frame, percentage = detect_bottle_and_draw(frame)
+        bottle_found, annotated_frame, percentage, inference_time = detect_bottle_and_draw(frame)
         annotated_file_name = f"annotated_{uuid.uuid4()}_{filename}"
         annotated_file_path = os.path.join("tmp", annotated_file_name)
         cv2.imwrite(annotated_file_path, annotated_frame)
@@ -160,9 +188,9 @@ def upload_file():
             executor.submit(background_task, original_file_path, annotated_file_path, unique_file_name, annotated_file_name, percentage)
             executor.shutdown(wait=False)
 
-            return jsonify({"message": "Bottle detected", "status": True, "confidence": percentage}), 200
+            return jsonify({"message": "Bottle detected", "status": True, "confidence": percentage, "Detection time": f"{inference_time:.4f} seconds"}), 200
         else:
-            return jsonify({"message": "No bottle detected", "status": False}), 200
+            return jsonify({"message": "No bottle detected", "status": False, "Detection time": f"{inference_time:.4f} seconds"}), 200
     else:
         return jsonify({"error": "Invalid file format. Only PNG and JPEG are accepted."}), 400
 
