@@ -164,7 +164,7 @@ def upload_file():
         with open(original_file_path, 'wb') as f:
             f.write(file_bytes)
 
-        bottle_found, annotated_frame, percentage, inference_time = detect_bottle_and_draw(frame)
+        bottle_found, annotated_frame, percentage, inference_time, total_time = detect_bottle_and_draw(frame)
         annotated_file_name = f"annotated_{uuid.uuid4()}_{filename}"
         annotated_file_path = os.path.join("tmp", annotated_file_name)
         cv2.imwrite(annotated_file_path, annotated_frame)
@@ -175,9 +175,22 @@ def upload_file():
             executor.submit(background_task, original_file_path, annotated_file_path, unique_file_name, annotated_file_name, percentage)
             executor.shutdown(wait=False)
 
-            return jsonify({"message": "Bottle detected", "status": True, "confidence": percentage, "Detection time": f"{inference_time:.4f} seconds"}), 200
+            return jsonify({
+                "message": "Bottle detected",
+                "status": True,
+                "confidence": percentage,
+                "Detection time": f"{inference_time:.4f} seconds",
+                "Total time": f"{total_time:.4f} seconds"
+            }), 200
+
         else:
-            return jsonify({"message": "No bottle detected", "status": False, "Detection time": f"{inference_time:.4f} seconds"}), 200
+            return jsonify({
+                "message": "No bottle detected",
+                "status": False,
+                "Detection time": f"{inference_time:.4f} seconds",
+                "Total time": f"{total_time:.4f} seconds"
+            }), 200
+
     else:
         return jsonify({"error": "Invalid file format. Only PNG and JPEG are accepted."}), 400
 
