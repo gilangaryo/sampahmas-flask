@@ -58,7 +58,7 @@ def detect_bottle_and_draw(frame):
 
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
-        if confidence > 0.5:
+        if confidence > 0.01:
             idx = int(detections[0, 0, i, 1])
             if CLASSES[idx] == "bottle":
                 logging.info("Bottle detected!")
