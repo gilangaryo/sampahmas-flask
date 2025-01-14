@@ -168,8 +168,10 @@ def upload_file():
         annotated_file_name = f"annotated_{uuid.uuid4()}_{filename}"
         annotated_file_path = os.path.join("tmp", annotated_file_name)
         cv2.imwrite(annotated_file_path, annotated_frame)
-
+        logging.info(f"DETEKSI ??")
+        
         if bottle_found:
+            logging.info(f"FOUND!!!!!!!! ??")
             unique_file_name = f"{uuid.uuid4()}_{filename}"
             executor = ThreadPoolExecutor(max_workers=3)
             executor.submit(background_task, original_file_path, annotated_file_path, unique_file_name, annotated_file_name, percentage)
