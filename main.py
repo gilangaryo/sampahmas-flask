@@ -95,7 +95,7 @@ def upload_to_firebase(file_path, firebase_path):
         return None
 
 def send_data_to_node_api(url):
-    NODE_API_URL = 'https://sampahmas-backend-ox9f.onrender.com/api/endpoint'
+    NODE_API_URL = 'https://m2bvdfxc-3000.asse.devtunnels.ms/api/endpoint'
     data = {"message": "Bottle detected", "url": url}
 
     try:
