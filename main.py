@@ -53,33 +53,33 @@ def detect_bottle_and_draw(frame):
 
     inference_time = end_time - start_time
 
-    bottle_found = False
-    percentage = 0
+    detected_objects = []
 
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
-        if confidence > 0.01:
+        if confidence > 0.01:  # Ambang batas confidence untuk menampilkan hasil
             idx = int(detections[0, 0, i, 1])
-            if CLASSES[idx] == "bottle":
-                logging.info("Bottle detected!")
-                bottle_found = True
-                percentage = int(confidence * 100)
+            label = CLASSES[idx]
+            percentage = int(confidence * 100)
 
-                box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
-                (startX, startY, endX, endY) = box.astype("int")
+            box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
+            (startX, startY, endX, endY) = box.astype("int")
 
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                label = f"{CLASSES[idx]}: {percentage}%"
-                y = startY - 8 if startY - 10 > 10 else startY + 10
-                cv2.putText(frame, label, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-                break
+            # Tambahkan objek yang terdeteksi ke daftar
+            detected_objects.append({"label": label, "confidence": percentage, "box": (startX, startY, endX, endY)})
+
+            # Gambar kotak dan label pada frame
+            cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
+            text = f"{label}: {percentage}%"
+            y = startY - 8 if startY - 10 > 10 else startY + 10
+            cv2.putText(frame, text, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
 
     total_end_time = time.time()
     total_time = total_end_time - total_start_time
     logging.info(f"Inference time: {inference_time:.4f} seconds")
     logging.info(f"Total time (preprocessing + inference + postprocessing): {total_time:.4f} seconds")
 
-    return bottle_found, frame, percentage, inference_time, total_time
+    return detected_objects, frame, inference_time, total_time
 
 
 def upload_to_firebase(file_path, firebase_path):
