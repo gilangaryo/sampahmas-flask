@@ -76,7 +76,6 @@ def detect_bottle_and_draw(frame):
                 logging.info("Bottle detected!")
                 bottle_found = True
                 percentage = int(confidence * 100)
-
                 box = detections[0, 0, i, 3:7] * np.array([frame.shape[1], frame.shape[0], frame.shape[1], frame.shape[0]])
                 (startX, startY, endX, endY) = box.astype("int")
 
@@ -89,6 +88,7 @@ def detect_bottle_and_draw(frame):
     total_end_time = time.time()
     total_time = total_end_time - total_start_time
     logging.info(f"Inference time: {inference_time:.4f} seconds")
+    logging.info(f"Percentage: {percentage}% confidence")
     logging.info(f"Total time (preprocessing + inference + postprocessing): {total_time:.4f} seconds")
 
     return bottle_found, frame, percentage, inference_time, total_time
