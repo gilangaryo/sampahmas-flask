@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOC Sensor MS1100 Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        h1 {
+            color: #4CAF50;
+        }
+
+        #data {
+            font-size: 2em;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>VOC Sensor MS1100 Monitor</h1>
+    <p>Air Quality Reading:</p>
+    <div id="data">Loading...</div>
+
+    <script>
+        async function fetchData() {
+            try {
+                const response = await fetch('http://127.0.0.1:3000/api/voc');
+
+                const data = await response.text();
+                const vocValue = parseFloat(data);
+
+                let quality = '';
+                if (vocValue <= 0.5) quality = 'Sangat Baik';
+                else if (vocValue <= 1.0) quality = 'Baik';
+                else if (vocValue <= 3.0) quality = 'Sedang';
+                else if (vocValue <= 5.0) quality = 'Buruk';
+                else quality = 'Sangat Buruk';
+
+                document.getElementById('data').innerHTML = `
+                    VOC Level: ${vocValue} ppm<br>
+                    Kualitas Udara: <strong>${quality}</strong>
+                `;
+            } catch (error) {
+                document.getElementById('data').innerText = 'Error fetching data';
+            }
+        }
+
+        setInterval(fetchData, 1000); // Fetch data setiap detik
+        fetchData(); // Fetch pertama
+    </script>
+
+</body>
+
+</html>
